@@ -22,7 +22,7 @@ import subprocess
 from setuptools import Extension, setup
 
 NAME = 'n2'
-VERSION = '0.1.7'
+VERSION = '0.1.8'
 
 
 def long_description():
@@ -60,7 +60,7 @@ def set_binary_mac():
 
 def is_buildable():
     try:
-        for option, flag in zip(['C++14', 'OpenMP'], ['-std=c++14', '-fopenmp']):
+        for option, flag in zip(['C++14', 'OpenMP'], ['-std=c++14', '-fopenmp','-pthread' , '-lpthread', '-Wl','--no-as-needed', '-lstdc++fs']):
             for cmd, env in zip(['gcc', 'g++'], ['CC', 'CXX']):
                 cmd = os.environ.get(env) or cmd
                 test_cmd = 'echo "int main(){}" | ' + cmd + ' -fsyntax-only ' + flag + ' -xc++ -'
@@ -91,7 +91,7 @@ def define_extensions(**kwargs):
 
     sources = ['./src/heuristic.cc', './src/hnsw.cc', './src/hnsw_node.cc',
                './src/hnsw_build.cc', './src/hnsw_model.cc', './src/hnsw_search.cc',
-               './src/mmap.cc', './bindings/python/n2.pyx']
+               './src/mmap.cc', './src/hnswCluster.cc', './bindings/python/n2.pyx']
 
     boost_dirs = ['assert', 'bind', 'concept_check', 'config', 'core', 'detail', 'heap', 'iterator', 'mp11', 'mpl',
                   'parameter', 'preprocessor', 'static_assert', 'throw_exception', 'type_traits', 'utility']

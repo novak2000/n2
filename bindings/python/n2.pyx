@@ -46,6 +46,34 @@ cdef extern from "n2/hnsw.h" namespace "n2":
         void PrintDegreeDist() nogil except +
         void PrintConfigs() nogil except +
 
+cdef extern from "n2/hnsw_cluster.h" namespace "n2":
+    cdef cppclass HnswCluster:
+        HnswCluster(int, int, vector[string], string) except +
+        void SearchByVector(const vector[float]&, size_t, size_t,
+                                  vector[vector[pair[int, float]]]&) nogil except +
+
+cdef class _HnswCluster:
+    cdef HnswCluster* obj
+
+    def __cinit__(self, _thread_size, _dim, _paths, _metric):
+        cdef int thread_size = _thread_size
+        cdef int dim = _dim
+        cdef string metric = _metric.encode('ascii')
+        cdef vector[string] paths = _paths
+        self.obj = new HnswCluster( thread_size, dim, paths, metric)
+
+    def __dealloc__(self):
+        del self.obj
+
+    def search_by_vector_incl_dist(self, _v, _k, _ef_search):
+        cdef vector[float] v = _v
+        cdef size_t k = _k
+        cdef size_t ef_search = _ef_search
+        cdef vector[vector[pair[int, float]]] ret
+        with nogil:
+            self.obj.SearchByVector(v, k, ef_search, ret)
+        return ret
+
 cdef class _HnswIndex:
     cdef Hnsw* obj
 
@@ -167,6 +195,15 @@ cdef class _HnswIndex:
         with nogil:
             self.obj.PrintConfigs()
 
+class HnswClusterIndex(object):
+    def __init__(self, thread_size, dimension, paths ,metric='angular'):
+        self.model = _HnswCluster(thread_size, dimension, paths, metric)
+
+    def search_by_vector(self, v, k, ef_search=-1, include_distances=True):
+        if ef_search == -1:
+            ef_search = k * 50
+
+        return self.model.search_by_vector_incl_dist(v, k, ef_search)
 
 class HnswIndex(object):
     def __init__(self, dimension, metric='angular'):

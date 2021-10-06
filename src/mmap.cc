@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "n2/mmap.h"
-
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -44,6 +44,7 @@ void Mmap::Map(char const* fname) {
     file_size_ = QueryFileSize();
     if (file_size_ <= 0) throw std::runtime_error("[Error] Memory mapping failed! (file_size==zero)");
     data_ = static_cast<char*>(mmap(0, file_size_, PROT_READ, MAP_SHARED, file_handle_, 0));
+    madvise(0, file_size_, MADV_RANDOM);
     if (data_ == MAP_FAILED) throw std::runtime_error("[Error] Memory mapping failed!");
 }
 

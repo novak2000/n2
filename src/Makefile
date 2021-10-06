@@ -27,12 +27,12 @@ all: shared_lib
 
 shared_lib: libn2.so
 
-libn2.so: hnsw.o hnsw_build.o hnsw_search.o hnsw_model.o hnsw_node.o heuristic.o mmap.o
+libn2.so: hnsw.o hnsw_build.o hnsw_search.o hnsw_model.o hnsw_node.o heuristic.o mmap.o hnswCluster.o
 	$(CXX) $(CXXFLAGS) -shared -o $@ $(LDFLAGS) $?
 
 static_lib: libn2.a
 
-libn2.a: hnsw.o hnsw_build.o hnsw_search.o hnsw_model.o hnsw_node.o heuristic.o mmap.o
+libn2.a: hnsw.o hnsw_build.o hnsw_search.o hnsw_model.o hnsw_node.o heuristic.o mmap.o hnswCluster.o
 	ar rvs $@ $?
 
 clean:

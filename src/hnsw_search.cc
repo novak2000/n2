@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "n2/hnsw_search_impl.h"
-
+#include <iostream>
 #include <xmmintrin.h>
 
 #include "n2/max_heap.h"
@@ -71,6 +71,8 @@ template<typename DistFuncType>
 template<typename ResultType>
 void HnswSearchImpl<DistFuncType>::SearchByVector_(const vector<float>& qvec, size_t k, int ef_search, 
                                                    bool ensure_k, ResultType& result) {
+    int djovak = 0;
+    int ostali = 0;
     if (ef_search < 0)
         ef_search = 50 * k;
 
@@ -82,10 +84,14 @@ void HnswSearchImpl<DistFuncType>::SearchByVector_(const vector<float>& qvec, si
         qraw = &qvec[0];
     }
 
-    _mm_prefetch(qraw, _MM_HINT_T0);
+    // _mm_prefetch(qraw, _MM_HINT_T0);
     int cur_node_id = model_->GetEnterpointId();
     const float* vec = (const float*)(model_level0_node_base_offset_ + cur_node_id * memory_per_node_level0_);
-    _mm_prefetch(vec, _MM_HINT_NTA);
+    if(((long long)vec)/4096 != (((long long)vec)+512*4-1)/4096){
+        djovak++;
+    }
+    ostali++;
+    // _mm_prefetch(vec, _MM_HINT_NTA);
     float cur_dist = dist_func_(qraw, vec, data_dim_);
             
     if (ensure_k) {
@@ -94,6 +100,7 @@ void HnswSearchImpl<DistFuncType>::SearchByVector_(const vector<float>& qvec, si
     }
 
     bool changed;
+    // std::cout << model_->GetMaxLevel() << "<< max layer\n";
     for (auto i = model_->GetMaxLevel(); i > 0; --i) {
         visited_list_->Reset();
         unsigned int visited_mark = visited_list_->GetVisitMark();
@@ -106,19 +113,24 @@ void HnswSearchImpl<DistFuncType>::SearchByVector_(const vector<float>& qvec, si
             int offset = *((int*)(model_level0_ + cur_node_id * memory_per_node_level0_));
             const int* friends_with_size = (const int*)(model_higher_level_ 
                                            + (offset+i-1) * memory_per_node_higher_level_);
-            _mm_prefetch(friends_with_size, _MM_HINT_T0);
+            // _mm_prefetch(friends_with_size, _MM_HINT_T0);
             int size = friends_with_size[0];
            
             for (auto j = 1; j <= size; ++j) {
-                _mm_prefetch(visited + friends_with_size[j], _MM_HINT_T0);
+                // _mm_prefetch(visited + friends_with_size[j], _MM_HINT_T0);
             }
+            // std::cout << "broj layera: " << size << '\n';
             for (auto j = 1; j <= size; ++j) {
                 int fid = friends_with_size[j];
                 if (visited[fid] != visited_mark) {
-                    _mm_prefetch(qraw, _MM_HINT_T0);
+                    // _mm_prefetch(qraw, _MM_HINT_T0);
                     const float* vec = (const float*)(model_level0_node_base_offset_ 
                                        + fid * memory_per_node_level0_);
-                    _mm_prefetch(vec, _MM_HINT_NTA);
+                    // _mm_prefetch(vec, _MM_HINT_NTA);
+                    if(((long long)vec)/4096 != (((long long)vec)+512*4-1)/4096){
+                        djovak++;
+                    }
+                    ostali++;
                     visited[fid] = visited_mark;
                     float d = dist_func_(qraw, vec, data_dim_);
                     if (d < cur_dist) {
@@ -131,8 +143,9 @@ void HnswSearchImpl<DistFuncType>::SearchByVector_(const vector<float>& qvec, si
             }
         }
     }
-
+    // std::cout <<"nivoi > 0: "<< djovak << '/' << ostali << " :)\n";
     CallSearchById_(cur_node_id, cur_dist, qraw, k, ef_search, ensure_k, result);
+    
 }
 
 template<typename DistFuncType>
@@ -191,19 +204,19 @@ void HnswSearchImpl<DistFuncType>::SearchByIdV1_(int cur_node_id, float cur_dist
         float minimum_distance = farthest_distance;
         const int* friends_with_size = (const int*)(model_level0_ 
                                         + cur_node_id * memory_per_node_level0_ + sizeof(int));
-        _mm_prefetch(friends_with_size, _MM_HINT_T0);
+        // _mm_prefetch(friends_with_size, _MM_HINT_T0);
         int size = friends_with_size[0];
 
         for (auto j = 1; j <= size; ++j) {
-            _mm_prefetch(visited + friends_with_size[j], _MM_HINT_T0);
+            // _mm_prefetch(visited + friends_with_size[j], _MM_HINT_T0);
         }
         for (auto j = 1; j <= size; ++j) {
             int node_id = friends_with_size[j];
             if (visited[node_id] != visited_mark) {
-                _mm_prefetch(qraw, _MM_HINT_T0);
+                // _mm_prefetch(qraw, _MM_HINT_T0);
                 const float* vec = (const float*)(model_level0_node_base_offset_ 
                                    + node_id * memory_per_node_level0_);
-                _mm_prefetch(vec, _MM_HINT_NTA);
+                // _mm_prefetch(vec, _MM_HINT_NTA);
                 visited[node_id] = visited_mark;
                 float d = dist_func_(qraw, vec, data_dim_);
                 if (d < minimum_distance || candidate_found_cnt < ef_search) {
@@ -224,6 +237,8 @@ template<typename DistFuncType>
 template<typename ResultType>
 void HnswSearchImpl<DistFuncType>::SearchByIdV2_(int cur_node_id, float cur_dist, const float* qraw, size_t k, 
                                                  size_t ef_search, bool ensure_k, ResultType& result) {
+    int djovak = 0;
+    int ostali = 0;
     IdDistancePairMinHeap candidates;
     IdDistancePairMinHeap visited_nodes;
     DistanceMaxHeap found_distances;
@@ -254,19 +269,27 @@ void HnswSearchImpl<DistFuncType>::SearchByIdV2_(int cur_node_id, float cur_dist
 
         const int* friends_with_size = (const int*)(model_level0_ 
                                         + cur_node_id * memory_per_node_level0_ + sizeof(int));
-        _mm_prefetch(friends_with_size, _MM_HINT_T0);
+        // if(((long long)friends_with_size)/4096 != (((long long)friends_with_size)+(((int)friends_with_size[0])-1)*4-1)/4096){
+        //     djovak++;
+        // }
+        // ostali++;
+        // _mm_prefetch(friends_with_size, _MM_HINT_T0);
         int size = friends_with_size[0];
 
         for (auto j = 1; j <= size; ++j) {
-            _mm_prefetch(visited + friends_with_size[j], _MM_HINT_T0);
+            // _mm_prefetch(visited + friends_with_size[j], _MM_HINT_T0);
         }
         for (auto j = 1; j <= size; ++j) {
             int node_id = friends_with_size[j];
             if (visited[node_id] != visited_mark) {
-                _mm_prefetch(qraw, _MM_HINT_T0);
+                // _mm_prefetch(qraw, _MM_HINT_T0);
                 const float* vec = (const float*)(model_level0_node_base_offset_ 
                                    + node_id * memory_per_node_level0_);
-                _mm_prefetch(vec, _MM_HINT_NTA);
+                if(((long long)vec)/4096 != (((long long)vec)+512*4-1)/4096){
+                    djovak++;
+                }
+                ostali++;
+                // _mm_prefetch(vec, _MM_HINT_NTA);
                 visited[node_id] = visited_mark;
                 float d = dist_func_(qraw, vec, data_dim_);
                 if (d < found_distances.top() || found_distances.size() < ef_search) {
@@ -279,7 +302,7 @@ void HnswSearchImpl<DistFuncType>::SearchByIdV2_(int cur_node_id, float cur_dist
             }
         }
     }
-
+    // std::cout << "djovak nivo 0: " << djovak << '/' << ostali << "\n";
     MakeSearchResult(k, candidates, visited_nodes, result);
 }
 

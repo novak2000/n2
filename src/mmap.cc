@@ -15,6 +15,7 @@
 #include "n2/mmap.h"
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
@@ -42,6 +43,7 @@ void Mmap::Map(char const* fname) {
     file_handle_ = open(fname, O_RDONLY);
     if (file_handle_ == -1) throw std::runtime_error("[Error] Failed to read file: " + std::string(fname));
     file_size_ = QueryFileSize();
+    posix_fadvise(file_handle_, 0, 0, POSIX_FADV_RANDOM);
     if (file_size_ <= 0) throw std::runtime_error("[Error] Memory mapping failed! (file_size==zero)");
     data_ = static_cast<char*>(mmap(0, file_size_, PROT_READ, MAP_SHARED, file_handle_, 0));
     madvise(0, file_size_, MADV_RANDOM);

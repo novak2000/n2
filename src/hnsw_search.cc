@@ -335,11 +335,15 @@ bool HnswSearchImpl<DistFuncType>::PrepareEnsureKSearch(int cur_node_id, vector<
 template<typename DistFuncType>
 void HnswSearchImpl<DistFuncType>::MakeSearchResult(size_t k, IdDistancePairMinHeap& candidates, 
                                                     IdDistancePairMinHeap& visited_nodes, vector<int>& result) {
-
+    
+    float last_dist_cand = -1.0;
+    float last_dist_vis = -1.0;
     while (result.size() < k) {
-        if (!candidates.empty() and !visited_nodes.empty()) {
+        if (!candidates.empty() && !visited_nodes.empty()) {
             const IdDistancePair& c = candidates.top();
             const IdDistancePair& v = visited_nodes.top();
+            last_dist_cand = c.second;
+            last_dist_vis = v.second;
             if (c.second < v.second) {
                 result.emplace_back(c.first);
                 candidates.pop();
@@ -349,15 +353,31 @@ void HnswSearchImpl<DistFuncType>::MakeSearchResult(size_t k, IdDistancePairMinH
             }
         } else if (!candidates.empty()) {
             const IdDistancePair& c = candidates.top();
+            last_dist_cand = c.second;
             result.emplace_back(c.first);
             candidates.pop();
         } else if (!visited_nodes.empty()) {
             const IdDistancePair& v = visited_nodes.top();
+            last_dist_vis = v.second;
             result.emplace_back(v.first);
             visited_nodes.pop();
         } else {
             break;
         }
+    }
+    while(!candidates.empty() && (candidates.top().second <= 0.0 
+                                || (last_dist_cand <= 0.25
+                                && candidates.top().second == last_dist_cand 
+                                && last_dist_cand <= last_dist_vis))){
+        result.emplace_back(candidates.top().first);
+        candidates.pop();
+    }
+    while(!visited_nodes.empty() && (visited_nodes.top().second <= 0.0
+                                || (last_dist_vis <= 0.25
+                                && visited_nodes.top().second == last_dist_vis 
+                                && last_dist_vis <= last_dist_cand))){
+        result.emplace_back(visited_nodes.top().first);
+        visited_nodes.pop();
     }
 }
 
@@ -365,10 +385,14 @@ template<typename DistFuncType>
 void HnswSearchImpl<DistFuncType>::MakeSearchResult(size_t k, IdDistancePairMinHeap& candidates, 
                                                     IdDistancePairMinHeap& visited_nodes, 
                                                     vector<pair<int, float>>& result) {
+    float last_dist_cand = -1.0;
+    float last_dist_vis = -1.0;
     while (result.size() < k) {
         if (!candidates.empty() && !visited_nodes.empty()) {
             const IdDistancePair& c = candidates.top();
             const IdDistancePair& v = visited_nodes.top();
+            last_dist_cand = c.second;
+            last_dist_vis = v.second;
             if (c.second < v.second) {
                 result.emplace_back(std::move(const_cast<IdDistancePair&>(c)));
                 candidates.pop();
@@ -378,16 +402,37 @@ void HnswSearchImpl<DistFuncType>::MakeSearchResult(size_t k, IdDistancePairMinH
             }
         } else if (!candidates.empty()) {
             const IdDistancePair& c = candidates.top();
+            last_dist_cand = c.second;
             result.emplace_back(std::move(const_cast<IdDistancePair&>(c)));
             candidates.pop();
         } else if (!visited_nodes.empty()) {
             const IdDistancePair& v = visited_nodes.top();
+            last_dist_vis = v.second;
             result.emplace_back(std::move(const_cast<IdDistancePair&>(v)));
             visited_nodes.pop();
         } else {
             break;
         }
     }
+
+    while(!candidates.empty() && (candidates.top().second <= 0.0001 
+                                || (last_dist_cand <= 0.25
+                                && candidates.top().second == last_dist_cand 
+                                && last_dist_cand <= last_dist_vis))){
+        const IdDistancePair& c = candidates.top();
+        result.emplace_back(std::move(const_cast<IdDistancePair&>(c)));
+        candidates.pop();
+    }
+    while(!visited_nodes.empty() && (visited_nodes.top().second <= 0.0001
+                                || (last_dist_vis <= 0.25
+                                && visited_nodes.top().second == last_dist_vis 
+                                && last_dist_vis <= last_dist_cand))){
+            const IdDistancePair& v = visited_nodes.top();
+        result.emplace_back(std::move(const_cast<IdDistancePair&>(v)));
+        visited_nodes.pop();
+    }
+
+    //std::cout << "promenaaa";
 
     if (metric_ == DistanceKind::DOT) {
         for (auto& id_distance : result)

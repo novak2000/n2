@@ -25,11 +25,12 @@ public:
                                size_t ef_search,
                                std::vector<std::vector<std::pair<int, float>>>& result);
 private:
-    std::vector<Hnsw*> cluster;
-    ctpl::thread_pool *pool;
-    std::vector<std::pair<int,float>>* results;
+    std::vector<std::shared_ptr<const HnswModel>> cluster;
+    size_t data_dim_;
+    DistanceKind metric_;
+    bool ensure_k_ = false;
+    // std::vector<std::pair<int,float>>* results;
     int max_threads;
-
 };
 
 

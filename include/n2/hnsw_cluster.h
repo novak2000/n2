@@ -26,6 +26,7 @@ public:
                                std::vector<std::vector<std::pair<int, float>>>& result);
 private:
     std::vector<std::shared_ptr<const HnswModel>> cluster;
+    std::vector<std::shared_ptr<HnswSearch>> searcher_pool_global;
     size_t data_dim_;
     DistanceKind metric_;
     bool ensure_k_ = false;

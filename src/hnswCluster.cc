@@ -14,6 +14,8 @@ namespace n2 {
                              std::vector<std::string> hnsw_paths, std::string metric="angular") {
         max_threads = thread_pool_size;
         data_dim_ = dim;
+        // std::vector<std::shared_ptr<HnswSearch>> searcher_pool_;
+        
         
         if (metric == "L2" || metric =="euclidean") {
             metric_ = DistanceKind::L2;
@@ -39,6 +41,10 @@ namespace n2 {
             data_dim_ = cluster.back()->GetDataDim();
             metric_ = cluster.back()->GetMetric();
         }
+        for(size_t i=0;i<cluster.size();i++)
+        {
+            searcher_pool_global.push_back(HnswSearch::GenerateSearcher(cluster[i], data_dim_, metric_));
+        }
     }
 
     HnswCluster::~HnswCluster(){
@@ -49,18 +55,19 @@ namespace n2 {
                                size_t ef_search,
                                std::vector<std::vector<std::pair<int, float>>>& result) {
         result.resize(cluster.size());
-        std::vector<std::shared_ptr<HnswSearch>> searcher_pool_;
-        for(size_t i=0;i<cluster.size();i++)
-        {
-            searcher_pool_.push_back(HnswSearch::GenerateSearcher(cluster[i], data_dim_, metric_));
-        }
+        // std::vector<std::shared_ptr<HnswSearch>> searcher_pool_;
+        // for(size_t i=0;i<cluster.size();i++)
+        // {
+        //     searcher_pool_.push_back(HnswSearch::GenerateSearcher(cluster[i], data_dim_, metric_));
+        // }
 
-        #pragma omp parallel num_threads(max_threads)
+        #pragma omp parallel num_threads(cluster.size())
         {
+            std::shared_ptr<HnswSearch> searcher = HnswSearch::GenerateSearcher(cluster[omp_get_thread_num()], data_dim_, metric_);
             #pragma omp for schedule(runtime)
             for(size_t i = 0; i<cluster.size();i++){
-                auto& s = searcher_pool_[i];
-                s->SearchByVector(qvec,k, ef_search, ensure_k_, result[i]);
+                auto& s = searcher;
+                s->SearchByVector(qvec,k, ef_search, ensure_k_, result[omp_get_thread_num()]);
             }
         }
     }

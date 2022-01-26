@@ -63,12 +63,14 @@ namespace n2 {
 
         #pragma omp parallel num_threads(cluster.size())
         {
-            std::shared_ptr<HnswSearch> searcher = HnswSearch::GenerateSearcher(cluster[omp_get_thread_num()], data_dim_, metric_);
-            #pragma omp for schedule(runtime)
-            for(size_t i = 0; i<cluster.size();i++){
-                auto& s = searcher;
-                s->SearchByVector(qvec,k, ef_search, ensure_k_, result[omp_get_thread_num()]);
-            }
+            // #pragma omp for schedule(runtime)
+            // for(size_t i = 0; i<cluster.size();i++){
+                // if(i==0)
+                //     searcher_pool_global[omp_get_thread_num()] = HnswSearch::GenerateSearcher(cluster[omp_get_thread_num()], data_dim_, metric_);
+                // auto& s = searcher_pool_global[omp_get_thread_num()];
+                auto& s = searcher_pool_global[omp_get_thread_num()];
+                s->SearchByVector(qvec, k, ef_search, ensure_k_, result[omp_get_thread_num()]);
+            // }
         }
     }
 
